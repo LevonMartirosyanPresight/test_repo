@@ -1,14 +1,11 @@
 from datetime import datetime
-import os
-import platform
+import sys
 
-print(f"Hello from Levon! Current time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-print(f"Running on: {platform.system()} {platform.release()}")
-print(f"Python version: {os.sys.version}")
+def main():
+    """Main entry point for the application."""
+    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"Hello from Levon! Current time: {current_time}")
+    return 0
 
-# Add error handling
-try:
-    result = 10 / 2
-    print(f"Calculation result: {result}")
-except Exception as e:
-    print(f"Error occurred: {e}")
+if __name__ == "__main__":
+    sys.exit(main())
