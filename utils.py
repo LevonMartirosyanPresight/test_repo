@@ -1,150 +1,112 @@
-#!/usr/bin/env python3
-"""
-Utility functions for the test repository application.
-
-This module contains helper functions for common operations
-including file handling, data validation, and system utilities.
-"""
+"""Utility functions for the test repository."""
 
 import os
 import sys
-import json
-import hashlib
+import platform
 from datetime import datetime
-from typing import Dict, List, Any, Optional
-
-
-def get_file_size(filepath: str) -> int:
-    """Get the size of a file in bytes."""
-    try:
-        return os.path.getsize(filepath)
-    except OSError:
-        return 0
-
-
-def calculate_file_hash(filepath: str, algorithm: str = 'md5') -> Optional[str]:
-    """Calculate hash of a file using specified algorithm."""
-    try:
-        hash_obj = hashlib.new(algorithm)
-        with open(filepath, 'rb') as f:
-            for chunk in iter(lambda: f.read(4096), b""):
-                hash_obj.update(chunk)
-        return hash_obj.hexdigest()
-    except (OSError, ValueError):
-        return None
-
-
-def validate_json_file(filepath: str) -> bool:
-    """Validate if a file contains valid JSON."""
-    try:
-        with open(filepath, 'r', encoding='utf-8') as f:
-            json.load(f)
-        return True
-    except (json.JSONDecodeError, OSError):
-        return False
+import hashlib
+import json
+from typing import Dict, Any, List, Optional
 
 
 def get_system_info() -> Dict[str, str]:
-    """Get system information as a dictionary."""
+    """Get comprehensive system information."""
     return {
-        'platform': sys.platform,
-        'python_version': sys.version.split()[0],
-        'current_dir': os.getcwd(),
-        'user': os.environ.get('USER', 'unknown'),
-        'timestamp': datetime.now().isoformat()
+        'platform': platform.system(),
+        'platform_release': platform.release(),
+        'platform_version': platform.version(),
+        'architecture': platform.machine(),
+        'hostname': platform.node(),
+        'processor': platform.processor(),
+        'python_version': platform.python_version(),
+        'python_implementation': platform.python_implementation()
     }
 
 
-def format_file_size(size_bytes: int) -> str:
-    """Format file size in human-readable format."""
+def format_timestamp(timestamp: Optional[datetime] = None) -> str:
+    """Format timestamp as human-readable string."""
+    if timestamp is None:
+        timestamp = datetime.now()
+    return timestamp.strftime('%Y-%m-%d %H:%M:%S')
+
+
+def calculate_file_hash(filepath: str, algorithm: str = 'md5') -> str:
+    """Calculate hash of a file."""
+    if not os.path.exists(filepath):
+        raise FileNotFoundError(f"File not found: {filepath}")
+    
+    hash_obj = hashlib.new(algorithm)
+    with open(filepath, 'rb') as f:
+        for chunk in iter(lambda: f.read(4096), b""):
+            hash_obj.update(chunk)
+    return hash_obj.hexdigest()
+
+
+def save_system_info(filepath: str = 'system_info.json') -> Dict[str, Any]:
+    """Save system information to JSON file."""
+    info = get_system_info()
+    info['timestamp'] = format_timestamp()
+    info['script_path'] = os.path.abspath(__file__)
+    
+    with open(filepath, 'w') as f:
+        json.dump(info, f, indent=2)
+    
+    return info
+
+
+def validate_python_version(min_version: str = '3.7') -> bool:
+    """Validate Python version meets minimum requirements."""
+    current = sys.version_info
+    required = tuple(map(int, min_version.split('.')))
+    return current >= required
+
+
+def get_directory_size(directory: str) -> int:
+    """Calculate total size of directory in bytes."""
+    total_size = 0
+    for dirpath, dirnames, filenames in os.walk(directory):
+        for filename in filenames:
+            filepath = os.path.join(dirpath, filename)
+            if os.path.exists(filepath):
+                total_size += os.path.getsize(filepath)
+    return total_size
+
+
+def format_bytes(size: int) -> str:
+    """Format bytes into human-readable format."""
     for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
-        if size_bytes < 1024.0:
-            return f"{size_bytes:.1f} {unit}"
-        size_bytes /= 1024.0
-    return f"{size_bytes:.1f} PB"
+        if size < 1024.0:
+            return f"{size:.2f} {unit}"
+        size /= 1024.0
+    return f"{size:.2f} PB"
 
 
-def backup_file(filepath: str, backup_dir: str = 'backups') -> bool:
-    """Create a backup of a file."""
-    try:
-        os.makedirs(backup_dir, exist_ok=True)
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        filename = os.path.basename(filepath)
-        backup_path = os.path.join(backup_dir, f"{filename}_{timestamp}.bak")
-        
-        with open(filepath, 'rb') as src, open(backup_path, 'wb') as dst:
-            dst.write(src.read())
-        return True
-    except OSError:
-        return False
-
-
-def list_files_by_extension(directory: str, extension: str) -> List[str]:
-    """List all files with a specific extension in a directory."""
-    try:
-        extension = extension.lower().lstrip('.')
-        return [
-            f for f in os.listdir(directory)
-            if os.path.isfile(os.path.join(directory, f)) and f.lower().endswith(f'.{extension}')
-        ]
-    except OSError:
-        return []
-
-
-def create_summary_report(directory: str = '.') -> Dict[str, Any]:
-    """Create a summary report of files in a directory."""
-    stats = {
-        'total_files': 0,
-        'total_size': 0,
-        'file_types': {},
-        'largest_file': {'name': '', 'size': 0},
-        'generated_at': datetime.now().isoformat()
-    }
+def main():
+    """Demonstrate utility functions."""
+    print("=== System Information Utility ===")
     
-    try:
-        for root, dirs, files in os.walk(directory):
-            # Skip hidden directories and .git
-            dirs[:] = [d for d in dirs if not d.startswith('.')]
-            
-            for file in files:
-                if file.startswith('.'):
-                    continue
-                    
-                filepath = os.path.join(root, file)
-                size = get_file_size(filepath)
-                
-                stats['total_files'] += 1
-                stats['total_size'] += size
-                
-                # Track file types
-                ext = os.path.splitext(file)[1].lower() or 'no_extension'
-                stats['file_types'][ext] = stats['file_types'].get(ext, 0) + 1
-                
-                # Track largest file
-                if size > stats['largest_file']['size']:
-                    stats['largest_file'] = {'name': file, 'size': size}
+    # Display system info
+    info = get_system_info()
+    print(f"Platform: {info['platform']} {info['platform_release']}")
+    print(f"Python: {info['python_version']} ({info['python_implementation']})")
+    print(f"Architecture: {info['architecture']}")
+    print(f"Hostname: {info['hostname']}")
     
-    except OSError:
-        pass
+    # Validate Python version
+    if validate_python_version():
+        print("✅ Python version meets requirements")
+    else:
+        print("❌ Python version below minimum requirements")
     
-    stats['total_size_formatted'] = format_file_size(stats['total_size'])
-    return stats
-
+    # Calculate directory size
+    current_dir = '.'
+    size = get_directory_size(current_dir)
+    print(f"Current directory size: {format_bytes(size)}")
+    
+    # Save system info
+    saved_info = save_system_info()
+    print(f"System info saved to: system_info.json")
+    print(f"Generated at: {saved_info['timestamp']}")
 
 if __name__ == '__main__':
-    # Demo utility functions
-    print("=== Utility Functions Demo ===")
-    
-    # System info
-    sys_info = get_system_info()
-    print(f"\nSystem Info:")
-    for key, value in sys_info.items():
-        print(f"  {key}: {value}")
-    
-    # Directory summary
-    print(f"\nDirectory Summary:")
-    summary = create_summary_report('.')
-    print(f"  Total files: {summary['total_files']}")
-    print(f"  Total size: {summary['total_size_formatted']}")
-    print(f"  Largest file: {summary['largest_file']['name']} ({format_file_size(summary['largest_file']['size'])})")
-    print(f"  File types: {summary['file_types']}")
+    main()
